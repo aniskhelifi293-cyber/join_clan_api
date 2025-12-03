@@ -1,0 +1,5 @@
+flask
+httpx
+pycryptodome
+PyJWT
+protobuf
