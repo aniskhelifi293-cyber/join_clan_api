@@ -1,6 +1,0 @@
-# requirements.txt
-Flask
-requests
-pycryptodome
-protobuf
-protobuf-decoder
