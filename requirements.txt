@@ -1,0 +1,8 @@
+httpx
+flask
+flask-cors
+cachetools
+google-api-python-client
+protobuf
+pycryptodome
+gunicorn
