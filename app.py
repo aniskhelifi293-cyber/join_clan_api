@@ -23,7 +23,7 @@ USERAGENT = "Dalvik/2.1.0 (Linux; U; Android 13; CPH2095 Build/RKQ1.211119.001)"
 SUPPORTED_REGIONS = {"IND", "BR", "US", "SAC", "NA", "SG", "RU", "ID", "TW", "VN", "TH", "ME", "PK", "CIS", "BD", "EUROPE"}
 
 # Regions we will try for /ban-check in order:
-BANCHECK_REGIONS = ["IND", "BR", "BD"]
+BANCHECK_REGIONS = ["IND", "BR", "BD", "US", "SAC", "NA", "SG", "RU", "ID", "TW", "VN", "TH", "ME", "PK", "CIS", "EUROPE"]
 
 # === Flask App Setup ===
 app = Flask(__name__)
@@ -37,7 +37,7 @@ def pad(text: bytes) -> bytes:
     return text + bytes([padding_length] * padding_length)
 
 def aes_cbc_encrypt(key: bytes, iv: bytes, plaintext: bytes) -> bytes:
-    aes = AES.new(key, AES.MODE_CBC, iv)
+    aes = AES.new(key, AES.MODE_CBC, iv)  # Fixed: Use AES.MODE_CBC instead of MODE_CBC
     return aes.encrypt(pad(plaintext))
 
 def decode_protobuf(encoded_data: bytes, message_type: message.Message) -> message.Message:
@@ -160,11 +160,50 @@ async def GetAccountInformation(uid, unk, region, endpoint):
         proto = decode_protobuf(resp.content, AccountPersonalShow_pb2.AccountPersonalShowInfo)
         return json.loads(json_format.MessageToJson(proto))
 
+# === MODIFIED FORMATTING FUNCTION ===
 def format_response(data):
     return {
-    "region": data.get("basicInfo", {}).get("region", ""),
-    "nickname": data.get("basicInfo", {}).get("nickname", "")
-}
+        "AccountInfo": {
+            "AccountAvatarId": data.get("basicInfo", {}).get("headPic"),
+            "AccountBPBadges": data.get("basicInfo", {}).get("badgeCnt"),
+            "AccountBPID": data.get("basicInfo", {}).get("badgeId"),
+            "AccountBannerId": data.get("basicInfo", {}).get("bannerId"),
+            "AccountCreateTime": data.get("basicInfo", {}).get("createAt"),
+            "AccountEXP": data.get("basicInfo", {}).get("exp"),
+            "AccountLastLogin": data.get("basicInfo", {}).get("lastLoginAt"),
+            "AccountLevel": data.get("basicInfo", {}).get("level"),
+            "AccountLikes": data.get("basicInfo", {}).get("liked"),
+            "AccountName": data.get("basicInfo", {}).get("nickname"),
+            "AccountRegion": data.get("basicInfo", {}).get("region"),
+            "AccountSeasonId": data.get("basicInfo", {}).get("seasonId"),
+            "AccountType": data.get("basicInfo", {}).get("accountType"),
+            "BrMaxRank": data.get("basicInfo", {}).get("maxRank"),
+            "BrRankPoint": data.get("basicInfo", {}).get("rankingPoints"),
+            "CsMaxRank": data.get("basicInfo", {}).get("csMaxRank"),
+            "CsRankPoint": data.get("basicInfo", {}).get("csRankingPoints"),
+            "EquippedWeapon": data.get("basicInfo", {}).get("weaponSkinShows", []),
+            "ReleaseVersion": data.get("basicInfo", {}).get("releaseVersion"),
+            "ShowBrRank": data.get("basicInfo", {}).get("showBrRank"),
+            "ShowCsRank": data.get("basicInfo", {}).get("showCsRank"),
+            "Title": data.get("basicInfo", {}).get("title")
+        },
+        "AccountProfileInfo": {
+            "EquippedOutfit": data.get("profileInfo", {}).get("clothes", []),
+            "EquippedSkills": data.get("profileInfo", {}).get("equipedSkills", [])
+        },
+        "GuildInfo": {
+            "GuildCapacity": data.get("clanBasicInfo", {}).get("capacity"),
+            "GuildID": str(data.get("clanBasicInfo", {}).get("clanId")),
+            "GuildLevel": data.get("clanBasicInfo", {}).get("clanLevel"),
+            "GuildMember": data.get("clanBasicInfo", {}).get("memberNum"),
+            "GuildName": data.get("clanBasicInfo", {}).get("clanName"),
+            "GuildOwner": str(data.get("clanBasicInfo", {}).get("captainId"))
+        },
+        "captainBasicInfo": data.get("captainBasicInfo", {}),
+        "creditScoreInfo": data.get("creditScoreInfo", {}),
+        "petInfo": data.get("petInfo", {}),
+        "socialinfo": data.get("socialInfo", {})
+    }
 
 # === API Routes ===
 @app.route('/player-info')
@@ -196,7 +235,18 @@ def ban_check():
         return jsonify({"error": "Please provide UID parameter."}), 400
 
     errors = {}
-    for region in BANCHECK_REGIONS:
+    # Check all regions instead of just BANCHECK_REGIONS
+    regions_to_check = list(SUPPORTED_REGIONS)
+    
+    # If a specific region is provided, check only that region first
+    server_param = request.args.get('server')
+    if server_param:
+        server_param = server_param.upper()
+        if server_param in SUPPORTED_REGIONS:
+            regions_to_check.remove(server_param)
+            regions_to_check.insert(0, server_param)
+    
+    for region in regions_to_check:
         try:
             # call the same endpoint you used elsewhere
             data = asyncio.run(GetAccountInformation(uid, "7", region, "/GetPlayerPersonalShow"))
@@ -219,18 +269,11 @@ def ban_check():
     }), 500
 
 # === Startup ===
- # <-- أضف هذا في بداية الملف
-
-# ... (بقية الكود)
-
 if __name__ == '__main__':
     # Railway provides the PORT environment variable
     port = int(os.environ.get('PORT', 5000))
     print(f"[🚀] Starting {__name__.upper()} on port {port} ...")
     try:
-        # Note: startup() is not defined in your provided code, you might need to fix this
-        # asyncio.run(startup()) 
-        
         # Start the background token refresher
         start_background_refresher(SUPPORTED_REGIONS)
         print("[✅] Background token refresher started.")
