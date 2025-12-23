@@ -206,6 +206,9 @@ def format_response(data):
     }
 
 # === API Routes ===
+@app.route('/ping')
+def ping():
+    return jsonify({"status": "alive"}), 200
 @app.route('/player-info')
 def get_account_info():
     region = request.args.get('region')
